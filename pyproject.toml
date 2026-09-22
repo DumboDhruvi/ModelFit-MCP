@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "modelfit-mcp"
+version = "0.1.0"
+description = "Hardware-aware Hugging Face discovery, sizing, and swappable local model gateway for AI agents."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Dhruv Kumar"}
+]
+keywords = ["mcp", "huggingface", "hardware", "vram", "ai-agents", "transformers"]
+dependencies = [
+    "psutil>=5.9.0",
+]
+
+[project.optional-dependencies]
+ml = [
+    "torch>=2.0.0",
+    "transformers>=4.36.0",
+]
+dev = [
+    "pytest>=7.0.0",
+]
+
+[project.scripts]
+modelfit-server = "modelfit.server:run_stdio_server"
+modelfit-api = "modelfit.local_api:run_api_server"
+
+[tool.setuptools.packages.find]
+where = ["src"]
