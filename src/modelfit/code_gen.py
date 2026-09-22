@@ -1,4 +1,4 @@
-"""Generates boilerplate integration code for selected models."""
+"""Generates boilerplate integration code across multiple languages."""
 
 def generate_transformers_snippet(
     model_id: str,
@@ -16,7 +16,6 @@ from transformers import pipeline
 
 print("Loading {model_id} on {target_device.upper()}...")
 
-# Load pipeline with hardware-optimized device mapping
 classifier = pipeline(
     task="{pipeline_tag}",
     model="{model_id}",
@@ -25,31 +24,94 @@ classifier = pipeline(
 )
 
 def run_inference(input_data):
-    """
-    Run inference on input (e.g. image path or URL for vision tasks).
-    """
-    results = classifier(input_data)
-    return results
+    return classifier(input_data)
 
 if __name__ == "__main__":
-    print("Model {model_id} loaded successfully!")
+    print("Model {model_id} ready!")
 '''
 
 
 def generate_client_snippet(host: str = "127.0.0.1", port: int = 7860) -> str:
     """Generates Python client code consuming the local ModelFit micro-API."""
-    return f'''# Connects to ModelFit Local Gateway
+    return f'''# ModelFit Local Python Client
 import requests
 
 GATEWAY_URL = "http://{host}:{port}"
 
 def predict(input_data):
-    response = requests.post(f"{{GATEWAY_URL}}/predict", json={{"input": input_data}})
-    response.raise_for_status()
-    return response.json()["predictions"]
+    resp = requests.post(f"{{GATEWAY_URL}}/predict", json={{"input": input_data}})
+    resp.raise_for_status()
+    return resp.json()["predictions"]
 
 def swap_model(model_id, task="image-classification"):
-    response = requests.post(f"{{GATEWAY_URL}}/swap", json={{"model_id": model_id, "task": task}})
-    response.raise_for_status()
-    return response.json()
+    resp = requests.post(f"{{GATEWAY_URL}}/swap", json={{"model_id": model_id, "task": task}})
+    resp.raise_for_status()
+    return resp.json()
+'''
+
+
+def generate_flutter_snippet(host: str = "127.0.0.1", port: int = 7860) -> str:
+    """Generates Dart / Flutter client code to consume ModelFit Local Gateway."""
+    return f'''// ModelFit Flutter/Dart Client
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
+class ModelFitClient {{
+  final String gatewayUrl;
+
+  ModelFitClient({{this.gatewayUrl = 'http://{host}:{port}'}});
+
+  Future<List<Map<String, dynamic>>> predict(String inputData) async {{
+    final response = await http.post(
+      Uri.parse('$gatewayUrl/predict'),
+      headers: {{'Content-Type': 'application/json'}},
+      body: jsonEncode({{'input': inputData}}),
+    );
+
+    if (response.statusCode == 200) {{
+      final data = jsonDecode(response.body);
+      return List<Map<String, dynamic>>.from(data['predictions']);
+    }} else {{
+      throw Exception('Failed to predict: ${{response.body}}');
+    }}
+  }}
+
+  Future<void> swapModel(String modelId, {{String task = 'image-classification'}}) async {{
+    final response = await http.post(
+      Uri.parse('$gatewayUrl/swap'),
+      headers: {{'Content-Type': 'application/json'}},
+      body: jsonEncode({{'model_id': modelId, 'task': task}}),
+    );
+
+    if (response.statusCode != 200) {{
+      throw Exception('Failed to swap model: ${{response.body}}');
+    }}
+  }}
+}}
+'''
+
+
+def generate_node_snippet(host: str = "127.0.0.1", port: int = 7860) -> str:
+    """Generates Node.js / JavaScript client code."""
+    return f'''// ModelFit Node.js / TypeScript Client
+const GATEWAY_URL = 'http://{host}:{port}';
+
+async function predict(inputData) {{
+  const res = await fetch(`${{GATEWAY_URL}}/predict`, {{
+    method: 'POST',
+    headers: {{ 'Content-Type': 'application/json' }},
+    body: JSON.stringify({{ input: inputData }})
+  }});
+  const data = await res.json();
+  return data.predictions;
+}}
+
+async function swapModel(modelId, task = 'image-classification') {{
+  const res = await fetch(`${{GATEWAY_URL}}/swap`, {{
+    method: 'POST',
+    headers: {{ 'Content-Type': 'application/json' }},
+    body: JSON.stringify({{ model_id: modelId, task }})
+  }});
+  return await res.json();
+}}
 '''

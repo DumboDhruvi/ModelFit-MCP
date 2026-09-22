@@ -1,17 +1,24 @@
-"""Unified Local Model Adapter and Gateway with VRAM-safe hot-swapping."""
+"""Unified Local Model Adapter and Gateway with Multi-Modal Support and VRAM-Safe Hot-Swapping."""
 
 import gc
 from typing import Any, Dict, List, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
 
 @dataclass
 class Prediction:
     label: str
     score: float
+    box: Optional[Dict[str, float]] = None
+    extra: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"label": self.label, "score": self.score}
+        d = {"label": self.label, "score": self.score}
+        if self.box:
+            d["box"] = self.box
+        if self.extra:
+            d["extra"] = self.extra
+        return d
 
 
 class ModelGateway:
@@ -62,16 +69,37 @@ class ModelGateway:
             except ImportError:
                 resolved_device = "cpu"
 
-        # 3. Load HuggingFace pipeline
+        # 3. Load HuggingFace pipeline with CUDA OOM protection fallback
         from transformers import pipeline
-        self.pipeline = pipeline(
-            task=pipeline_tag,
-            model=model_id,
-            device=resolved_device
-        )
+        try:
+            self.pipeline = pipeline(
+                task=pipeline_tag,
+                model=model_id,
+                device=resolved_device
+            )
+            self.target_device = resolved_device
+        except Exception as err:
+            # Fallback to CPU if GPU encountered an OOM during load
+            err_msg = str(err).lower()
+            if ("out of memory" in err_msg or "cuda" in err_msg) and resolved_device != "cpu":
+                gc.collect()
+                try:
+                    import torch
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                except ImportError:
+                    pass
+                self.pipeline = pipeline(
+                    task=pipeline_tag,
+                    model=model_id,
+                    device="cpu"
+                )
+                self.target_device = "cpu"
+            else:
+                raise err
+
         self.active_model_id = model_id
         self.pipeline_tag = pipeline_tag
-        self.target_device = resolved_device
 
         return {
             "status": "loaded",
@@ -80,23 +108,53 @@ class ModelGateway:
             "task": self.pipeline_tag
         }
 
-    def predict(self, input_data: Any) -> List[Prediction]:
-        """Abstract prediction method providing normalized output across models."""
+    def predict(self, input_data: Any, **kwargs) -> List[Prediction]:
+        """
+        Abstract prediction method providing normalized outputs across:
+        - image-classification
+        - object-detection
+        - zero-shot-image-classification
+        - text-generation / summarization
+        """
         if self.pipeline is None:
             raise RuntimeError("No model is currently loaded. Call load_model() first.")
 
-        raw_results = self.pipeline(input_data)
+        raw_results = self.pipeline(input_data, **kwargs)
 
-        # Normalize outputs across different vision and text models
         normalized: List[Prediction] = []
+
         if isinstance(raw_results, list):
             for item in raw_results:
-                if isinstance(item, dict) and "label" in item and "score" in item:
-                    normalized.append(Prediction(label=item["label"], score=round(item["score"], 4)))
-                elif isinstance(item, dict) and "generated_text" in item:
-                    normalized.append(Prediction(label=item["generated_text"], score=1.0))
-        elif isinstance(raw_results, dict) and "label" in raw_results:
-            normalized.append(Prediction(label=raw_results["label"], score=round(raw_results.get("score", 1.0), 4)))
+                if isinstance(item, dict):
+                    # Classification format: {"label": "...", "score": 0.95}
+                    if "label" in item and "score" in item:
+                        box = item.get("box")
+                        normalized.append(Prediction(
+                            label=item["label"],
+                            score=round(float(item["score"]), 4),
+                            box=box
+                        ))
+                    # Text generation format: {"generated_text": "..."}
+                    elif "generated_text" in item:
+                        normalized.append(Prediction(
+                            label=item["generated_text"],
+                            score=1.0
+                        ))
+                    # Summarization: {"summary_text": "..."}
+                    elif "summary_text" in item:
+                        normalized.append(Prediction(
+                            label=item["summary_text"],
+                            score=1.0
+                        ))
+        elif isinstance(raw_results, dict):
+            if "label" in raw_results:
+                normalized.append(Prediction(
+                    label=raw_results["label"],
+                    score=round(float(raw_results.get("score", 1.0)), 4),
+                    box=raw_results.get("box")
+                ))
+            elif "generated_text" in raw_results:
+                normalized.append(Prediction(label=raw_results["generated_text"], score=1.0))
 
         return normalized
 

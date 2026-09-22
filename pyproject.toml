@@ -27,6 +27,7 @@ dev = [
 ]
 
 [project.scripts]
+modelfit = "modelfit.cli:main"
 modelfit-server = "modelfit.server:run_stdio_server"
 modelfit-api = "modelfit.local_api:run_api_server"
 
