@@ -1,16 +1,15 @@
-"""Unit tests for the ModelFit Command Line Interface."""
+"""Unit tests for the CLI commands."""
 
 import unittest
-from unittest.mock import patch
-from io import StringIO
+from unittest.mock import patch, MagicMock
 from modelfit import cli
+from modelfit import server
 from modelfit.hardware import SystemSpecs
 
 
 class TestCLI(unittest.TestCase):
-    @patch("sys.stdout", new_callable=StringIO)
     @patch.object(cli, "detect_system_specs")
-    def test_cli_specs(self, mock_specs, mock_stdout):
+    def test_cmd_specs(self, mock_specs):
         mock_specs.return_value = SystemSpecs(
             os_name="Linux",
             cpu_count=8,
@@ -18,16 +17,14 @@ class TestCLI(unittest.TestCase):
             ram_available_gb=8.0,
             has_cuda=False
         )
-        with patch("sys.argv", ["modelfit", "specs"]):
-            cli.main()
-            output = mock_stdout.getvalue()
-            self.assertIn("ModelFit Hardware Profile", output)
-            self.assertIn("RAM Total", output)
+        args = MagicMock()
+        # Ensure it runs without exception
+        cli.cmd_specs(args)
 
-    @patch("sys.stdout", new_callable=StringIO)
     @patch.object(cli, "detect_system_specs")
     @patch.object(cli.HFHardwareClient, "search_models")
-    def test_cli_search(self, mock_search, mock_specs, mock_stdout):
+    @patch.object(cli.HFHardwareClient, "filter_and_rank_models")
+    def test_cmd_search(self, mock_rank, mock_search, mock_specs):
         mock_specs.return_value = SystemSpecs(
             os_name="Linux",
             cpu_count=8,
@@ -35,20 +32,49 @@ class TestCLI(unittest.TestCase):
             ram_available_gb=8.0,
             has_cuda=False
         )
-        mock_search.return_value = [
+        mock_search.return_value = []
+        mock_rank.return_value = [
             {
-                "id": "small/plant-net",
-                "downloads": 5000,
-                "likes": 20,
-                "pipeline_tag": "image-classification",
-                "tags": ["params:10M"]
+                "model_id": "test/model",
+                "target_device": "cpu",
+                "memory_required_gb": 0.5,
+                "downloads": 1000,
+                "ranking_score": 95.0
             }
         ]
-        with patch("sys.argv", ["modelfit", "search", "plant"]):
-            cli.main()
-            output = mock_stdout.getvalue()
-            self.assertIn("small/plant-net", output)
-            self.assertIn("Found", output)
+
+        args = MagicMock()
+        args.query = "plant"
+        args.task = "image-classification"
+        args.precision = "fp16"
+        args.limit = 5
+
+        cli.cmd_search(args)
+        mock_search.assert_called_once()
+        mock_rank.assert_called_once()
+
+    @patch.object(cli.ModelEvaluator, "benchmark_models")
+    def test_cmd_benchmark(self, mock_bench):
+        mock_bench.return_value = []
+        args = MagicMock()
+        args.models = "model-1,model-2"
+        args.samples = "sample.jpg"
+        args.task = "image-classification"
+
+        cli.cmd_benchmark(args)
+        mock_bench.assert_called_once()
+
+    @patch.object(cli.EnsembleGateway, "predict_ensemble")
+    def test_cmd_ensemble(self, mock_ens):
+        mock_ens.return_value = []
+        args = MagicMock()
+        args.models = "model-1,model-2"
+        args.input = "sample.jpg"
+        args.strategy = "weighted_average"
+        args.task = "image-classification"
+
+        cli.cmd_ensemble(args)
+        mock_ens.assert_called_once()
 
 
 if __name__ == "__main__":

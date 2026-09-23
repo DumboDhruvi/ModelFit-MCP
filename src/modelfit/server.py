@@ -5,10 +5,14 @@ import json
 from typing import Dict, Any
 from modelfit.hardware import detect_system_specs, can_model_run
 from modelfit.hf_client import HFHardwareClient
-from modelfit.code_gen import generate_transformers_snippet
+from modelfit.code_gen import generate_transformers_snippet, generate_ensemble_snippet
 from modelfit.adapter import gateway
+from modelfit.evaluator import ModelEvaluator
+from modelfit.ensemble import EnsembleGateway
 
 hf_client = HFHardwareClient()
+evaluator = ModelEvaluator()
+ensemble_gateway = EnsembleGateway()
 
 
 def handle_tool_call(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -98,6 +102,58 @@ def handle_tool_call(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
             "integration_code": code
         }
 
+    elif name == "benchmark_models":
+        model_ids = args.get("model_ids", [])
+        test_samples = args.get("test_samples", ["test_sample"])
+        pipeline_tag = args.get("pipeline_tag", "image-classification")
+        results = evaluator.benchmark_models(
+            model_ids=model_ids,
+            test_samples=test_samples,
+            pipeline_tag=pipeline_tag
+        )
+        return {
+            "status": "success",
+            "evaluated_count": len(results),
+            "leaderboard": [r.to_dict() for r in results],
+            "recommended_model": results[0].model_id if results else None
+        }
+
+    elif name == "find_ensemble_models":
+        query = args.get("query", "")
+        pipeline_tag = args.get("pipeline_tag", "image-classification")
+        max_models = args.get("max_models", 3)
+        candidates = ensemble_gateway.find_ensemble_candidates(
+            query=query,
+            pipeline_tag=pipeline_tag,
+            max_models=max_models
+        )
+        return {
+            "status": "success",
+            "count": len(candidates),
+            "models": candidates,
+            "recommendation": f"Ensemble of {len(candidates)} fast models fitting hardware headroom"
+        }
+
+    elif name == "ensemble_predict":
+        model_ids = args.get("model_ids", [])
+        input_data = args.get("input_data")
+        if not input_data:
+            return {"status": "error", "message": "Missing 'input_data' argument"}
+        strategy = args.get("strategy", "weighted_average")
+        pipeline_tag = args.get("pipeline_tag", "image-classification")
+
+        preds = ensemble_gateway.predict_ensemble(
+            input_data=input_data,
+            model_ids=model_ids,
+            pipeline_tag=pipeline_tag,
+            strategy=strategy
+        )
+        return {
+            "status": "success",
+            "strategy": strategy,
+            "predictions": [p.to_dict() for p in preds]
+        }
+
     else:
         return {"status": "error", "message": f"Unknown tool '{name}'"}
 
@@ -111,8 +167,7 @@ def run_stdio_server():
             req = json.loads(line)
             req_id = req.get("id")
             method = req.get("method")
-            params = req.get("params", {})
-
+            params = req.get("params", {})\n
             if method == "tools/call":
                 result = handle_tool_call(params.get("name"), params.get("arguments", {}))
                 response = {"jsonrpc": "2.0", "id": req_id, "result": result}
@@ -127,7 +182,10 @@ def run_stdio_server():
                             {"name": "swap_active_model", "description": "Hot-swap the active model with VRAM-safe memory purging"},
                             {"name": "get_active_model_status", "description": "Inspect currently loaded model and target device"},
                             {"name": "get_integration_code", "description": "Get drop-in Python inference code"},
-                            {"name": "recommend_and_scaffold", "description": "1-shot model search, hardware check, and code scaffolding"}
+                            {"name": "recommend_and_scaffold", "description": "1-shot model search, hardware check, and code scaffolding"},
+                            {"name": "benchmark_models", "description": "Run live accuracy and latency benchmarking on candidate models"},
+                            {"name": "find_ensemble_models", "description": "Find ultra-fast models suitable for low-latency ensembling"},
+                            {"name": "ensemble_predict", "description": "Execute ensemble prediction combining multiple models"}
                         ]
                     }
                 }
