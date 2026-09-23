@@ -7,12 +7,18 @@ on:
       - ".github/workflows/verify-pypi.yml"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   verify:
     name: PyPI E2E Verification
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
@@ -39,6 +45,7 @@ jobs:
           cat << 'EOF' > test_pypi_e2e.py
           import sys
           import json
+          import traceback
           import importlib.metadata
           from pprint import pprint
 
@@ -65,9 +72,9 @@ jobs:
               is_pip_install = ("site-packages" in modelfit.__file__) or ("dist-packages" in modelfit.__file__)
               assert is_pip_install, f"Not from site/dist-packages: {modelfit.__file__}"
               assert pkg_version == "0.1.0", f"Unexpected version: {pkg_version}"
-              log_test("Import from PyPI", True, f"Version {pkg_version} loaded from {modelfit.__file__}")
+              log_test("Import from PyPI", True, f"v{pkg_version} from {modelfit.__file__}")
           except Exception as e:
-              log_test("Import from PyPI", False, str(e))
+              log_test("Import from PyPI", False, f"{type(e).__name__}: {str(e)}")
 
           # 2. Hardware Detection & Memory Sizing
           try:
@@ -76,16 +83,16 @@ jobs:
               assert mem_fit["total_memory_required_gb"] > 0
               log_test("Hardware & Sizing", True, f"{specs.cpu_count} CPUs, {specs.ram_total_gb:.1f}GB RAM, Sizing: {mem_fit['total_memory_required_gb']}GB")
           except Exception as e:
-              log_test("Hardware & Sizing", False, str(e))
+              log_test("Hardware & Sizing", False, f"{type(e).__name__}: {str(e)}")
 
           # 3. Test MCP Tool: get_hardware_specs
           try:
               res = server.handle_tool_call("get_hardware_specs", {})
               assert res["status"] == "success"
               assert "ram_available_gb" in res["specs"]
-              log_test("MCP get_hardware_specs", True, f"RAM available: {res['specs']['ram_available_gb']} GB")
+              log_test("MCP get_hardware_specs", True, f"RAM avail: {res['specs']['ram_available_gb']} GB")
           except Exception as e:
-              log_test("MCP get_hardware_specs", False, str(e))
+              log_test("MCP get_hardware_specs", False, f"{type(e).__name__}: {str(e)}")
 
           # 4. Test MCP Tool: search_compatible_models
           try:
@@ -97,7 +104,7 @@ jobs:
               assert res["status"] == "success"
               log_test("MCP search_compatible_models", True, f"Found {res.get('count', 0)} models")
           except Exception as e:
-              log_test("MCP search_compatible_models", False, str(e))
+              log_test("MCP search_compatible_models", False, f"{type(e).__name__}: {str(e)}")
 
           # 5. Test MCP Tool: get_integration_code
           try:
@@ -110,7 +117,7 @@ jobs:
               assert "pipeline(" in res["code"]
               log_test("MCP get_integration_code", True, "Generated Python inference snippet")
           except Exception as e:
-              log_test("MCP get_integration_code", False, str(e))
+              log_test("MCP get_integration_code", False, f"{type(e).__name__}: {str(e)}")
 
           # 6. Test MCP Tool: recommend_and_scaffold
           try:
@@ -118,10 +125,9 @@ jobs:
                   "query": "bert",
                   "pipeline_tag": "text-classification"
               })
-              # Can succeed or return message if network/HF rate limits
-              log_test("MCP recommend_and_scaffold", True, f"Response status: {res.get('status')}")
+              log_test("MCP recommend_and_scaffold", True, f"Status: {res.get('status')}")
           except Exception as e:
-              log_test("MCP recommend_and_scaffold", False, str(e))
+              log_test("MCP recommend_and_scaffold", False, f"{type(e).__name__}: {str(e)}")
 
           # 7. Test MCP Tool: find_ensemble_models
           try:
@@ -131,9 +137,9 @@ jobs:
                   "max_models": 3
               })
               assert res["status"] == "success"
-              log_test("MCP find_ensemble_models", True, f"Found {res.get('count', 0)} lightweight candidates")
+              log_test("MCP find_ensemble_models", True, f"Found {res.get('count', 0)} candidates")
           except Exception as e:
-              log_test("MCP find_ensemble_models", False, str(e))
+              log_test("MCP find_ensemble_models", False, f"{type(e).__name__}: {str(e)}")
 
           # 8. Real Model Loading & Live Inference
           m1 = "hf-internal-testing/tiny-random-DistilBertForSequenceClassification"
@@ -151,9 +157,9 @@ jobs:
               test_input_1 = "ModelFit-MCP prevents OOM errors and guarantees safe memory bounds for agents."
               preds_1 = gateway.predict(test_input_1)
               assert len(preds_1) > 0
-              log_test("Live Model Inference (DistilBERT)", True, f"Active: {status_res['active_model']}, Prediction: label={preds_1[0].label}, score={preds_1[0].score}")
+              log_test("Live Model Inference (DistilBERT)", True, f"Model: {m1}, Pred: label={preds_1[0].label}, score={preds_1[0].score}")
           except Exception as e:
-              log_test("Live Model Inference (DistilBERT)", False, str(e))
+              log_test("Live Model Inference (DistilBERT)", False, f"{type(e).__name__}: {str(e)}")
 
           # 9. Dynamic Hot-Swapping with VRAM Purge
           m2 = "hf-internal-testing/tiny-random-BertForSequenceClassification"
@@ -170,9 +176,9 @@ jobs:
               test_input_2 = "Zero-latency model hot swapping with clean garbage collection."
               preds_2 = gateway.predict(test_input_2)
               assert len(preds_2) > 0
-              log_test("Hot-Swap & Inference (BERT)", True, f"Swapped to: {status_res2['active_model']}, Prediction: label={preds_2[0].label}, score={preds_2[0].score}")
+              log_test("Hot-Swap & Inference (BERT)", True, f"Swapped to: {m2}, Pred: label={preds_2[0].label}, score={preds_2[0].score}")
           except Exception as e:
-              log_test("Hot-Swap & Inference (BERT)", False, str(e))
+              log_test("Hot-Swap & Inference (BERT)", False, f"{type(e).__name__}: {str(e)}")
 
           # 10. Test MCP Tool: benchmark_models (Empirical Benchmarking)
           try:
@@ -187,9 +193,9 @@ jobs:
               assert bench_res["status"] == "success"
               leader = bench_res.get("recommended_model")
               lb = bench_res.get("leaderboard", [])
-              log_test("Empirical Benchmarking", True, f"Evaluated: {bench_res['evaluated_count']}, Recommended: {leader}, Top Latency: {lb[0]['avg_latency_ms'] if lb else 'N/A'}ms")
+              log_test("Empirical Benchmarking", True, f"Evaluated: {bench_res['evaluated_count']}, Recommended: {leader}")
           except Exception as e:
-              log_test("Empirical Benchmarking", False, str(e))
+              log_test("Empirical Benchmarking", False, f"{type(e).__name__}: {str(e)}")
 
           # 11. Test MCP Tool: ensemble_predict (Multi-Model Ensemble)
           try:
@@ -210,7 +216,7 @@ jobs:
               assert ens_res_vote["status"] == "success"
               log_test("Ensemble Predictions", True, f"Weighted Avg: {len(ens_res_avg['predictions'])} preds, Majority Vote: {len(ens_res_vote['predictions'])} preds")
           except Exception as e:
-              log_test("Ensemble Predictions", False, str(e))
+              log_test("Ensemble Predictions", False, f"{type(e).__name__}: {str(e)}")
 
           # 12. STDIO JSON-RPC 2.0 Simulation
           try:
@@ -234,12 +240,12 @@ jobs:
               assert len(lines) == 2
               assert len(lines[0]["result"]["tools"]) == 9
               assert lines[1]["result"]["status"] == "success"
-              log_test("STDIO JSON-RPC 2.0", True, f"9 tools listed, get_hardware_specs tool returned success")
+              log_test("STDIO JSON-RPC 2.0", True, "9 tools listed, tools/call succeeded")
           except Exception as e:
-              log_test("STDIO JSON-RPC 2.0", False, str(e))
+              log_test("STDIO JSON-RPC 2.0", False, f"{type(e).__name__}: {str(e)}")
 
           # Write Step Summary Markdown
-          summary_md = ["## 🧪 PyPI Package E2E Verification Report\n", "| Test Case | Status | Details |", "| :--- | :--- | :--- |"]
+          summary_md = ["# 🧪 PyPI Package E2E Verification Report\n", "| Test Case | Status | Details |", "| :--- | :--- | :--- |"]
           all_passed = True
           for name, status, details in results:
               icon = "✅" if status == "PASS" else "❌"
@@ -260,5 +266,19 @@ jobs:
               sys.exit(1)
           EOF
 
-          python test_pypi_e2e.py
-          cat /tmp/summary.md >> $GITHUB_STEP_SUMMARY
+          python test_pypi_e2e.py || EXIT_CODE=$?
+          cp /tmp/summary.md /tmp/verified_report.md
+          exit ${EXIT_CODE:-0}
+
+      - name: Save Verification Report Artifact
+        if: always()
+        run: |
+          cp /tmp/summary.md test_summary.md
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add test_summary.md
+          if ! git diff --staged --quiet; then
+            git commit -m "docs: publish live PyPI E2E verification test report"
+            git push origin main
+          fi
+          cat test_summary.md >> $GITHUB_STEP_SUMMARY
