@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ModelFit-MCP | Hardware-Aware Hugging Face Gateway</title>
+  <meta name="description" content="Hardware-Aware Hugging Face Discovery, Memory Fitting, Empirical Benchmarking & Swappable Local Model Gateway for AI Agents.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #131b2e;
+      --card-border: #1e293b;
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.25);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --code-bg: #0b1120;
+      --success: #34d399;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 0;
+      margin: 0;
+    }
+    header {
+      padding: 4rem 1.5rem 2rem;
+      text-align: center;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.35rem 0.75rem;
+      background: rgba(56, 189, 248, 0.1);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+    }
+    h1 {
+      font-size: 3rem;
+      font-weight: 800;
+      letter-spacing: -0.05em;
+      margin-bottom: 1rem;
+      background: linear-gradient(135deg, #ffffff 40%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .subtitle {
+      font-size: 1.25rem;
+      color: var(--text-muted);
+      margin-bottom: 2rem;
+      max-width: 750px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .cta-group {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      font-size: 0.95rem;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #090d16;
+    }
+    .btn-primary:hover {
+      box-shadow: 0 0 20px var(--accent-glow);
+      transform: translateY(-1px);
+    }
+    .btn-secondary {
+      background: var(--card-bg);
+      color: var(--text);
+      border: 1px solid var(--card-border);
+    }
+    .btn-secondary:hover {
+      border-color: var(--accent);
+    }
+    main {
+      max-width: 1000px;
+      margin: 2rem auto 5rem;
+      padding: 0 1.5rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin: 3rem 0;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1.75rem;
+    }
+    .card h3 {
+      font-size: 1.25rem;
+      margin-bottom: 0.5rem;
+      color: var(--accent);
+    }
+    .card p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+    .calc-box {
+      background: var(--card-bg);
+      border: 1px solid var(--accent);
+      border-radius: 12px;
+      padding: 2rem;
+      margin: 3rem 0;
+      box-shadow: 0 0 25px rgba(56, 189, 248, 0.08);
+    }
+    .calc-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+    .calc-controls {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+    }
+    .calc-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    label { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; }
+    input, select {
+      background: var(--code-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      padding: 0.6rem 0.8rem;
+      border-radius: 6px;
+      font-family: inherit;
+    }
+    .calc-result {
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--code-bg);
+      padding: 1rem;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      color: var(--success);
+    }
+    pre {
+      background: var(--code-bg);
+      padding: 1.25rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9rem;
+      border: 1px solid var(--card-border);
+      margin: 1.5rem 0;
+    }
+    code { font-family: 'JetBrains Mono', monospace; color: var(--accent); }
+    footer {
+      text-align: center;
+      padding: 2rem;
+      border-top: 1px solid var(--card-border);
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="badge">MCP COMPLIANT • ZERO OOM GUARANTEE</div>
+    <h1>ModelFit-MCP</h1>
+    <p class="subtitle">Hardware-aware Hugging Face discovery, live memory fitting, empirical benchmarking, and swappable local model gateway for AI agents.</p>
+    <div class="cta-group">
+      <a href="https://github.com/DumboDhruvi/ModelFit-MCP" class="btn btn-primary">View on GitHub</a>
+      <a href="#calculator" class="btn btn-secondary">VRAM Sizing Calculator</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="grid">
+      <div class="card">
+        <h3>⚡ Zero OOM Guarantee</h3>
+        <p>Calculates parameter count, precision bytes (FP32/FP16/INT8/INT4), and 25% activation headroom before suggesting or loading models.</p>
+      </div>
+      <div class="card">
+        <h3>📊 Empirical Benchmarking</h3>
+        <p>Runs test evaluations across candidate models fitting hardware specs, ranking them by live latency (ms) and confidence score.</p>
+      </div>
+      <div class="card">
+        <h3>🚀 Fast Ensembles</h3>
+        <p>Finds ultra-compact models fitting &le; 35% memory headroom and aggregates predictions with weighted average or majority voting.</p>
+      </div>
+      <div class="card">
+        <h3>🔄 Dynamic Hot-Swapping</h3>
+        <p>Clients consume an abstract gateway API (<code>/predict</code>). Swap models dynamically while purging VRAM to prevent memory leaks.</p>
+      </div>
+    </div>
+
+    <section id="calculator" class="calc-box">
+      <div class="calc-title">Interactive VRAM / Memory Fit Calculator</div>
+      <div class="calc-controls">
+        <div class="calc-group">
+          <label for="params">Parameters (Billions):</label>
+          <input type="number" id="params" value="1.0" step="0.1" min="0.01">
+        </div>
+        <div class="calc-group">
+          <label for="precision">Precision:</label>
+          <select id="precision">
+            <option value="4.0">FP32 (4.0 bytes/param)</option>
+            <option value="2.0" selected>FP16 / BF16 (2.0 bytes/param)</option>
+            <option value="1.0">INT8 (1.0 byte/param)</option>
+            <option value="0.5">INT4 / AWQ / GPTQ (0.5 bytes/param)</option>
+          </select>
+        </div>
+      </div>
+      <div class="calc-result" id="result">
+        Estimated Memory Required: 2.33 GB (including 25% activation headroom)
+      </div>
+    </section>
+
+    <h2>Quickstart</h2>
+    <pre><code># Install ModelFit-MCP
+git clone https://github.com/DumboDhruvi/ModelFit-MCP.git
+cd ModelFit-MCP
+pip install -e .
+
+# Inspect host hardware headroom
+modelfit specs
+
+# Search models fitting your machine
+modelfit search "plant disease" --task image-classification
+
+# Benchmark candidate models
+modelfit benchmark "model-1,model-2" --samples "sample.jpg"
+
+# Run high-speed ensemble
+modelfit ensemble "model-1,model-2" --input "sample.jpg"</code></pre>
+  </main>
+
+  <footer>
+    <p>Released under the MIT License • Built with ModelFit-MCP</p>
+  </footer>
+
+  <script>
+    const paramsInput = document.getElementById('params');
+    const precSelect = document.getElementById('precision');
+    const resultDiv = document.getElementById('result');
+
+    function update() {
+      const p = parseFloat(paramsInput.value) || 0;
+      const bpp = parseFloat(precSelect.value) || 2.0;
+      const baseGb = (p * 1e9 * bpp) / (1024 ** 3);
+      const totalGb = (baseGb * 1.25).toFixed(2);
+      resultDiv.textContent = `Estimated Memory Required: ${totalGb} GB (including 25% activation headroom)`;
+    }
+
+    paramsInput.addEventListener('input', update);
+    precSelect.addEventListener('change', update);
+  </script>
+</body>
+</html>
