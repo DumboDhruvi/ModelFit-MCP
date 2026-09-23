@@ -1,0 +1,235 @@
+name: Verify PyPI Package Release
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/verify-pypi.yml"
+  workflow_dispatch:
+
+jobs:
+  verify:
+    name: PyPI E2E Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install modelfit-mcp from PyPI in Isolated Directory
+        run: |
+          mkdir -p /tmp/isolated_pypi_test
+          cd /tmp/isolated_pypi_test
+          echo "=== Installing modelfit-mcp[ml] from PyPI ==="
+          pip install --no-cache-dir "modelfit-mcp[ml]"
+          pip show modelfit-mcp
+
+      - name: Verify CLI Commands
+        run: |
+          echo "=== Testing modelfit CLI ==="
+          modelfit --help
+          modelfit specs
+
+      - name: Run Full End-to-End Verification Script
+        run: |
+          cd /tmp/isolated_pypi_test
+          cat << 'EOF' > test_pypi_e2e.py
+          import sys
+          import json
+          import importlib.metadata
+          from pprint import pprint
+
+          print("=" * 60)
+          print("MODELFIT-MCP PYPI RELEASE E2E VERIFICATION")
+          print("=" * 60)
+
+          # 1. Verify Import Source and Version
+          import modelfit
+          import modelfit.server as server
+          from modelfit.adapter import gateway
+          from modelfit.hardware import detect_system_specs, can_model_run
+          from modelfit.sizing import calculate_memory_required
+
+          pkg_version = importlib.metadata.version("modelfit-mcp")
+          print(f"Loaded modelfit from: {modelfit.__file__}")
+          print(f"Installed PyPI Version: {pkg_version}")
+          assert "site-packages" in modelfit.__file__, "Must be imported from site-packages (PyPI install)!"
+          assert pkg_version == "0.1.0", f"Unexpected version: {pkg_version}"
+          print(">> [PASS] Package imported correctly from site-packages.")
+
+          # 2. Hardware Detection & Memory Sizing
+          specs = detect_system_specs()
+          print(f"Host Specs: {specs.cpu_count} CPUs, {specs.ram_total_gb:.2f} GB RAM, GPU: {specs.gpu_device_name or 'None'}")
+          mem_fit = calculate_memory_required(params_billions=0.5, precision="fp16", activation_headroom=0.25)
+          print(f"Calculated Memory for 0.5B FP16 model: {mem_fit['total_memory_required_gb']} GB")
+          assert mem_fit["total_memory_required_gb"] > 0
+          print(">> [PASS] Hardware detection & memory sizing verified.")
+
+          # 3. Test MCP Tool: get_hardware_specs
+          res = server.handle_tool_call("get_hardware_specs", {})
+          assert res["status"] == "success"
+          assert "ram_available_gb" in res["specs"]
+          print(">> [PASS] MCP tool: get_hardware_specs")
+
+          # 4. Test MCP Tool: search_compatible_models (Task: text-classification)
+          res = server.handle_tool_call("search_compatible_models", {
+              "query": "sentiment",
+              "pipeline_tag": "text-classification",
+              "precision": "fp16"
+          })
+          assert res["status"] == "success"
+          print(f"Found {res['count']} compatible models for 'sentiment'")
+          print(">> [PASS] MCP tool: search_compatible_models")
+
+          # 5. Test MCP Tool: get_integration_code
+          res = server.handle_tool_call("get_integration_code", {
+              "model_id": "hf-internal-testing/tiny-random-DistilBertForSequenceClassification",
+              "pipeline_tag": "text-classification",
+              "target_device": "cpu"
+          })
+          assert res["status"] == "success"
+          assert "pipeline(" in res["code"]
+          print(">> [PASS] MCP tool: get_integration_code")
+
+          # 6. Test MCP Tool: recommend_and_scaffold
+          res = server.handle_tool_call("recommend_and_scaffold", {
+              "query": "distilbert",
+              "pipeline_tag": "text-classification"
+          })
+          assert res["status"] == "success"
+          assert "selected_model" in res
+          print(f"Scaffold selected: {res['selected_model']['model_id']}")
+          print(">> [PASS] MCP tool: recommend_and_scaffold")
+
+          # 7. Test MCP Tool: find_ensemble_models
+          res = server.handle_tool_call("find_ensemble_models", {
+              "query": "bert",
+              "pipeline_tag": "text-classification",
+              "max_models": 3
+          })
+          assert res["status"] == "success"
+          print(f"Found {res['count']} ensemble candidate models fitting <= 35% headroom")
+          print(">> [PASS] MCP tool: find_ensemble_models")
+
+          # 8. Real Model Loading & Live Inference
+          m1 = "hf-internal-testing/tiny-random-DistilBertForSequenceClassification"
+          print(f"\n--- Loading Model 1 ({m1}) ---")
+          load_res = server.handle_tool_call("swap_active_model", {
+              "model_id": m1,
+              "pipeline_tag": "text-classification",
+              "params_billions": 0.01
+          })
+          assert load_res["status"] == "success", f"Load failed: {load_res}"
+
+          # Test MCP Tool: get_active_model_status
+          status_res = server.handle_tool_call("get_active_model_status", {})
+          assert status_res["active_model"] == m1
+          print(f"Active model confirmed: {status_res['active_model']} on device: {status_res['device']}")
+
+          # Run Live Predictions
+          test_input_1 = "ModelFit-MCP prevents OOM errors and guarantees safe memory bounds for agents."
+          preds_1 = gateway.predict(test_input_1)
+          print(f"Inference on sample 1: '{test_input_1[:45]}...'")
+          pprint([p.to_dict() for p in preds_1])
+          assert len(preds_1) > 0
+          assert hasattr(preds_1[0], "label") and hasattr(preds_1[0], "score")
+          print(">> [PASS] Live model inference verified.")
+
+          # 9. Dynamic Hot-Swapping with VRAM Purge
+          m2 = "hf-internal-testing/tiny-random-BertForSequenceClassification"
+          print(f"\n--- Hot-Swapping to Model 2 ({m2}) ---")
+          swap_res = server.handle_tool_call("swap_active_model", {
+              "model_id": m2,
+              "pipeline_tag": "text-classification",
+              "params_billions": 0.01
+          })
+          assert swap_res["status"] == "success"
+          status_res2 = server.handle_tool_call("get_active_model_status", {})
+          assert status_res2["active_model"] == m2
+          print(f"Active model updated to: {status_res2['active_model']}")
+
+          test_input_2 = "Zero-latency model hot swapping with clean garbage collection."
+          preds_2 = gateway.predict(test_input_2)
+          print(f"Inference on sample 2: '{test_input_2[:45]}...'")
+          pprint([p.to_dict() for p in preds_2])
+          assert len(preds_2) > 0
+          print(">> [PASS] Hot-swap & inference on second model verified.")
+
+          # 10. Test MCP Tool: benchmark_models (Empirical Benchmarking)
+          print("\n--- Running Empirical Model Benchmark ---")
+          bench_res = server.handle_tool_call("benchmark_models", {
+              "model_ids": [m1, m2],
+              "test_samples": [
+                  "The autonomous system performed without memory faults.",
+                  "System failure occurred due to lack of available hardware RAM."
+              ],
+              "pipeline_tag": "text-classification"
+          })
+          assert bench_res["status"] == "success"
+          print(f"Evaluated count: {bench_res['evaluated_count']}")
+          print(f"Leaderboard: Recommended Model = {bench_res['recommended_model']}")
+          for item in bench_res["leaderboard"]:
+              print(f"  Rank #{item['rank']} | {item['model_id']} | Latency: {item['avg_latency_ms']}ms | Composite: {item['composite_score']}")
+          print(">> [PASS] MCP tool: benchmark_models")
+
+          # 11. Test MCP Tool: ensemble_predict (Multi-Model Ensemble)
+          print("\n--- Running Multi-Model Ensemble Predictions ---")
+          # Weighted average strategy
+          ens_res_avg = server.handle_tool_call("ensemble_predict", {
+              "model_ids": [m1, m2],
+              "input_data": "ModelFit-MCP high performance ensemble prediction test sample.",
+              "pipeline_tag": "text-classification",
+              "strategy": "weighted_average"
+          })
+          assert ens_res_avg["status"] == "success"
+          print("Weighted Average Predictions:")
+          pprint(ens_res_avg["predictions"])
+
+          # Majority vote strategy
+          ens_res_vote = server.handle_tool_call("ensemble_predict", {
+              "model_ids": [m1, m2],
+              "input_data": "ModelFit-MCP high performance ensemble prediction test sample.",
+              "pipeline_tag": "text-classification",
+              "strategy": "majority_vote"
+          })
+          assert ens_res_vote["status"] == "success"
+          print("Majority Vote Predictions:")
+          pprint(ens_res_vote["predictions"])
+          print(">> [PASS] MCP tool: ensemble_predict")
+
+          # 12. STDIO JSON-RPC 2.0 Simulation
+          print("\n--- Testing STDIO JSON-RPC Protocol Compatibility ---")
+          import io
+          saved_stdin = sys.stdin
+          saved_stdout = sys.stdout
+
+          # Simulate client requesting tools/list
+          req_list = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}) + "\n"
+          # Simulate client calling tools/call get_hardware_specs
+          req_call = json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "get_hardware_specs", "arguments": {}}}) + "\n"
+
+          sys.stdin = io.StringIO(req_list + req_call)
+          sys.stdout = io.StringIO()
+
+          server.run_stdio_server()
+
+          output = sys.stdout.getvalue()
+          sys.stdin = saved_stdin
+          sys.stdout = saved_stdout
+
+          lines = [json.loads(l) for l in output.strip().split("\n") if l.strip()]
+          assert len(lines) == 2
+          assert lines[0]["id"] == 1 and len(lines[0]["result"]["tools"]) == 9
+          assert lines[1]["id"] == 2 and lines[1]["result"]["status"] == "success"
+          print(f"JSON-RPC tools/list returned {len(lines[0]['result']['tools'])} registered MCP tools.")
+          print(f"JSON-RPC tools/call returned status: {lines[1]['result']['status']}")
+          print(">> [PASS] STDIO JSON-RPC 2.0 server protocol verified.")
+
+          print("\n" + "=" * 60)
+          print("ALL 12 E2E PYPI TESTS PASSED WITH 100% SUCCESS!")
+          print("=" * 60)
+          EOF
+
+          python test_pypi_e2e.py
