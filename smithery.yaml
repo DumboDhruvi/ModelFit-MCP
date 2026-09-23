@@ -1,0 +1,4 @@
+startCommand:
+  type: stdio
+  config:
+    command: modelfit-server

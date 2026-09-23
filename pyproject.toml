@@ -10,9 +10,29 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
-    {name = "Dhruv Kumar"}
+    {name = "Dhruv Kumar", email = "dhruv01112004@gmail.com"}
 ]
-keywords = ["mcp", "huggingface", "hardware", "vram", "ai-agents", "transformers"]
+keywords = [
+    "mcp",
+    "model-context-protocol",
+    "huggingface",
+    "hardware",
+    "vram",
+    "ai-agents",
+    "transformers",
+    "ensemble",
+    "benchmarking"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "psutil>=5.9.0",
 ]
@@ -25,6 +45,12 @@ ml = [
 dev = [
     "pytest>=7.0.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/DumboDhruvi/ModelFit-MCP"
+Documentation = "https://dumbodhruvi.github.io/ModelFit-MCP"
+Repository = "https://github.com/DumboDhruvi/ModelFit-MCP.git"
+Issues = "https://github.com/DumboDhruvi/ModelFit-MCP/issues"
 
 [project.scripts]
 modelfit = "modelfit.cli:main"
