@@ -28,4 +28,9 @@ jobs:
 
     - name: Run unit and integration tests with pytest
       run: |
-        PYTHONPATH=src python -m pytest tests -v
+        PYTHONPATH=src python -m pytest tests -v --tb=short > pytest.log 2>&1 || {
+          ERR=$(cat pytest.log | tail -n 50 | tr '\n' ' | ')
+          echo "::error title=Pytest Failure::$ERR"
+          cat pytest.log
+          exit 1
+        }
