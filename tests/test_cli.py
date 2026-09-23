@@ -9,7 +9,15 @@ from modelfit.hardware import SystemSpecs
 
 class TestCLI(unittest.TestCase):
     @patch("sys.stdout", new_callable=StringIO)
-    def test_cli_specs(self, mock_stdout):
+    @patch.object(cli, "detect_system_specs")
+    def test_cli_specs(self, mock_specs, mock_stdout):
+        mock_specs.return_value = SystemSpecs(
+            os_name="Linux",
+            cpu_count=8,
+            ram_total_gb=16.0,
+            ram_available_gb=8.0,
+            has_cuda=False
+        )
         with patch("sys.argv", ["modelfit", "specs"]):
             cli.main()
             output = mock_stdout.getvalue()
@@ -18,7 +26,7 @@ class TestCLI(unittest.TestCase):
 
     @patch("sys.stdout", new_callable=StringIO)
     @patch.object(cli, "detect_system_specs")
-    @patch("modelfit.hf_client.HFHardwareClient.search_models")
+    @patch.object(cli.HFHardwareClient, "search_models")
     def test_cli_search(self, mock_search, mock_specs, mock_stdout):
         mock_specs.return_value = SystemSpecs(
             os_name="Linux",

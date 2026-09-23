@@ -4,6 +4,7 @@ import io
 import json
 import unittest
 from unittest.mock import patch, MagicMock
+from modelfit import local_api
 from modelfit.local_api import GatewayRequestHandler
 from modelfit.adapter import ModelGateway, Prediction
 
@@ -15,6 +16,7 @@ class MockServer:
 class TestLocalAPI(unittest.TestCase):
     def setUp(self):
         self.gateway = ModelGateway.get_instance()
+        self.gateway.pipeline = MagicMock()
 
     def _create_handler(self, method: str, path: str, body: dict = None):
         request = MagicMock()
@@ -55,7 +57,7 @@ class TestLocalAPI(unittest.TestCase):
         self.assertEqual(output["active_model"], "test-model")
         self.assertEqual(output["task"], "image-classification")
 
-    @patch("modelfit.adapter.ModelGateway.predict")
+    @patch.object(local_api.gateway, "predict")
     def test_post_predict(self, mock_predict):
         mock_predict.return_value = [Prediction(label="healthy", score=0.99)]
 
