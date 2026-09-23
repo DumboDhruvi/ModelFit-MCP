@@ -2,13 +2,13 @@
 
 import unittest
 from unittest.mock import patch
-from modelfit.server import handle_tool_call
+from modelfit import server
 from modelfit.hardware import SystemSpecs
 
 
 class TestPlantDetectionWorkflowE2E(unittest.TestCase):
-    @patch("modelfit.server.detect_system_specs")
-    @patch("modelfit.server.hf_client.search_models")
+    @patch.object(server, "detect_system_specs")
+    @patch.object(server.hf_client, "search_models")
     def test_plant_detection_workflow(self, mock_search, mock_specs):
         # 1. Deterministic system specs (8GB RAM, CPU fallback)
         mock_specs.return_value = SystemSpecs(
@@ -38,12 +38,12 @@ class TestPlantDetectionWorkflowE2E(unittest.TestCase):
         ]
 
         # 3. Query hardware specs
-        specs_res = handle_tool_call("get_hardware_specs", {})
+        specs_res = server.handle_tool_call("get_hardware_specs", {})
         self.assertEqual(specs_res["status"], "success")
         self.assertIn("specs", specs_res)
 
         # 4. Search compatible models
-        search_res = handle_tool_call(
+        search_res = server.handle_tool_call(
             "search_compatible_models",
             {"query": "plant disease", "pipeline_tag": "image-classification"}
         )
@@ -56,7 +56,7 @@ class TestPlantDetectionWorkflowE2E(unittest.TestCase):
         )
 
         # 5. One-shot recommend and scaffold
-        scaffold_res = handle_tool_call(
+        scaffold_res = server.handle_tool_call(
             "recommend_and_scaffold",
             {"query": "plant disease", "pipeline_tag": "image-classification"}
         )

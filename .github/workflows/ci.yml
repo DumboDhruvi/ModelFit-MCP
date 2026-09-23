@@ -24,15 +24,8 @@ jobs:
     - name: Install package and dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -e .[ml,dev]
+        pip install -e ".[ml,dev]"
 
     - name: Run unit and integration tests with pytest
       run: |
-        pytest tests -v --tb=short > pytest_log.txt 2>&1 || {
-          echo "## Pytest Failure Log (Python ${{ matrix.python-version }})" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cat pytest_log.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cat pytest_log.txt
-          exit 1
-        }
+        pytest tests -v
