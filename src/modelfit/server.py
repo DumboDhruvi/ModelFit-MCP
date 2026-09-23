@@ -167,7 +167,8 @@ def run_stdio_server():
             req = json.loads(line)
             req_id = req.get("id")
             method = req.get("method")
-            params = req.get("params", {})\n
+            params = req.get("params", {})
+
             if method == "tools/call":
                 result = handle_tool_call(params.get("name"), params.get("arguments", {}))
                 response = {"jsonrpc": "2.0", "id": req_id, "result": result}

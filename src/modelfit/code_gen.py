@@ -75,7 +75,7 @@ def predict(input_data):
     return resp.json()["predictions"]
 
 def swap_model(model_id, task="image-classification"):
-    resp = requests.post(f"{{GATEWAY_URL}}/swap", json={{"model_id\": model_id, \"task\": task}})
+    resp = requests.post(f"{{GATEWAY_URL}}/swap", json={{"model_id": model_id, "task": task}})
     resp.raise_for_status()
     return resp.json()
 '''
@@ -141,7 +141,8 @@ async function swapModel(modelId, task = 'image-classification') {{
   const res = await fetch(`${{GATEWAY_URL}}/swap`, {{
     method: 'POST',
     headers: {{ 'Content-Type': 'application/json' }},
-    body: JSON.stringify({{ model_id: modelId, task }})\n  }});
+    body: JSON.stringify({{ model_id: modelId, task }})
+  }});
   return await res.json();
 }}
 '''
