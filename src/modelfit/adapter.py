@@ -4,6 +4,11 @@ import gc
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, asdict
 
+try:
+    from transformers import pipeline
+except ImportError:
+    pipeline = None
+
 
 @dataclass
 class Prediction:
@@ -70,7 +75,9 @@ class ModelGateway:
                 resolved_device = "cpu"
 
         # 3. Load HuggingFace pipeline with CUDA OOM protection fallback
-        from transformers import pipeline
+        if pipeline is None:
+            raise RuntimeError("The 'transformers' package is required to load models.")
+
         try:
             self.pipeline = pipeline(
                 task=pipeline_tag,

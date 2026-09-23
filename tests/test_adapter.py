@@ -9,7 +9,7 @@ class TestModelGateway(unittest.TestCase):
     def setUp(self):
         self.gateway = ModelGateway()
 
-    @patch("transformers.pipeline")
+    @patch("modelfit.adapter.pipeline")
     def test_load_and_predict(self, mock_pipeline):
         mock_pipe = MagicMock()
         mock_pipe.return_value = [
@@ -28,7 +28,7 @@ class TestModelGateway(unittest.TestCase):
         self.assertEqual(preds[0].label, "Apple___Black_rot")
         self.assertAlmostEqual(preds[0].score, 0.9821)
 
-    @patch("transformers.pipeline")
+    @patch("modelfit.adapter.pipeline")
     def test_hot_swapping_frees_memory(self, mock_pipeline):
         mock_pipe_1 = MagicMock()
         mock_pipe_2 = MagicMock()

@@ -9,7 +9,7 @@ class TestMultiModalAdapter(unittest.TestCase):
     def setUp(self):
         self.gateway = ModelGateway()
 
-    @patch("transformers.pipeline")
+    @patch("modelfit.adapter.pipeline")
     def test_object_detection_normalization(self, mock_pipeline):
         mock_pipe = MagicMock()
         mock_pipe.return_value = [
@@ -30,7 +30,7 @@ class TestMultiModalAdapter(unittest.TestCase):
         self.assertIsNotNone(results[0].box)
         self.assertEqual(results[0].box["xmin"], 10.0)
 
-    @patch("transformers.pipeline")
+    @patch("modelfit.adapter.pipeline")
     def test_text_generation_normalization(self, mock_pipeline):
         mock_pipe = MagicMock()
         mock_pipe.return_value = [{"generated_text": "Plant has nitrogen deficiency."}]
