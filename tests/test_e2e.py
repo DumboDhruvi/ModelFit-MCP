@@ -3,12 +3,23 @@
 import unittest
 from unittest.mock import patch
 from modelfit.server import handle_tool_call
+from modelfit.hardware import SystemSpecs
 
 
 class TestPlantDetectionWorkflowE2E(unittest.TestCase):
-    @patch("modelfit.hf_client.HFHardwareClient.search_models")
-    def test_plant_detection_workflow(self, mock_search):
-        # 1. Mock Hugging Face search response
+    @patch("modelfit.server.detect_system_specs")
+    @patch("modelfit.server.hf_client.search_models")
+    def test_plant_detection_workflow(self, mock_search, mock_specs):
+        # 1. Deterministic system specs (8GB RAM, CPU fallback)
+        mock_specs.return_value = SystemSpecs(
+            os_name="Linux",
+            cpu_count=8,
+            ram_total_gb=16.0,
+            ram_available_gb=8.0,
+            has_cuda=False
+        )
+
+        # 2. Mock Hugging Face search response
         mock_search.return_value = [
             {
                 "id": "linkanjarad/mobilenet_v2_1.0_224-plant-disease-identification",
@@ -26,12 +37,12 @@ class TestPlantDetectionWorkflowE2E(unittest.TestCase):
             }
         ]
 
-        # 2. Query hardware specs
+        # 3. Query hardware specs
         specs_res = handle_tool_call("get_hardware_specs", {})
         self.assertEqual(specs_res["status"], "success")
         self.assertIn("specs", specs_res)
 
-        # 3. Search compatible models
+        # 4. Search compatible models
         search_res = handle_tool_call(
             "search_compatible_models",
             {"query": "plant disease", "pipeline_tag": "image-classification"}
@@ -44,7 +55,7 @@ class TestPlantDetectionWorkflowE2E(unittest.TestCase):
             "linkanjarad/mobilenet_v2_1.0_224-plant-disease-identification"
         )
 
-        # 4. One-shot recommend and scaffold
+        # 5. One-shot recommend and scaffold
         scaffold_res = handle_tool_call(
             "recommend_and_scaffold",
             {"query": "plant disease", "pipeline_tag": "image-classification"}

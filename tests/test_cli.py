@@ -3,7 +3,8 @@
 import unittest
 from unittest.mock import patch
 from io import StringIO
-from modelfit.cli import main
+from modelfit.cli import main, cmd_specs, cmd_search
+from modelfit.hardware import SystemSpecs
 
 
 class TestCLI(unittest.TestCase):
@@ -16,8 +17,16 @@ class TestCLI(unittest.TestCase):
             self.assertIn("RAM Total", output)
 
     @patch("sys.stdout", new_callable=StringIO)
-    @patch("modelfit.hf_client.HFHardwareClient.search_models")
-    def test_cli_search(self, mock_search, mock_stdout):
+    @patch("modelfit.cli.detect_system_specs")
+    @patch("modelfit.cli.HFHardwareClient.search_models")
+    def test_cli_search(self, mock_search, mock_specs, mock_stdout):
+        mock_specs.return_value = SystemSpecs(
+            os_name="Linux",
+            cpu_count=8,
+            ram_total_gb=16.0,
+            ram_available_gb=8.0,
+            has_cuda=False
+        )
         mock_search.return_value = [
             {
                 "id": "small/plant-net",
