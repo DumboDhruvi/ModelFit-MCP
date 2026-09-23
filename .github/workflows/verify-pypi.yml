@@ -65,8 +65,7 @@ jobs:
               import modelfit
               import modelfit.server as server
               from modelfit.adapter import gateway
-              from modelfit.hardware import detect_system_specs, can_model_run
-              from modelfit.sizing import calculate_memory_required
+              from modelfit.hardware import detect_system_specs, estimate_required_memory_gb, can_model_run
 
               pkg_version = importlib.metadata.version("modelfit-mcp")
               is_pip_install = ("site-packages" in modelfit.__file__) or ("dist-packages" in modelfit.__file__)
@@ -79,9 +78,10 @@ jobs:
           # 2. Hardware Detection & Memory Sizing
           try:
               specs = detect_system_specs()
-              mem_fit = calculate_memory_required(params_billions=0.5, precision="fp16", activation_headroom=0.25)
-              assert mem_fit["total_memory_required_gb"] > 0
-              log_test("Hardware & Sizing", True, f"{specs.cpu_count} CPUs, {specs.ram_total_gb:.1f}GB RAM, Sizing: {mem_fit['total_memory_required_gb']}GB")
+              mem_fit_gb = estimate_required_memory_gb(params_in_billions=0.5, precision="fp16")
+              fit_check = can_model_run(0.5, specs, precision="fp16")
+              assert mem_fit_gb > 0
+              log_test("Hardware & Sizing", True, f"{specs.cpu_count} CPUs, {specs.ram_total_gb:.1f}GB RAM, Sizing: {mem_fit_gb}GB, Target: {fit_check['target']}")
           except Exception as e:
               log_test("Hardware & Sizing", False, f"{type(e).__name__}: {str(e)}")
 
@@ -278,7 +278,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add test_summary.md
           if ! git diff --staged --quiet; then
-            git commit -m "docs: publish live PyPI E2E verification test report"
+            git commit -m "docs: publish live PyPI E2E verification test report [skip ci]"
             git push origin main
           fi
           cat test_summary.md >> $GITHUB_STEP_SUMMARY
