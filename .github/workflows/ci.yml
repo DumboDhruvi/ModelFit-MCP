@@ -28,14 +28,4 @@ jobs:
 
     - name: Run unit and integration tests with pytest
       run: |
-        python -m pytest tests -v --tb=short > test_err.log 2>&1 || {
-          cat test_err.log
-          python -c '
-        with open("test_err.log") as f:
-            lines = f.readlines()
-        failures = [l.strip() for l in lines if "FAILED" in l or "ERROR" in l or "AssertionError" in l or "Traceback" in l or "Exception" in l]
-        for f_line in failures[:15]:
-            print(f"::error title=Pytest Details::{f_line}")
-          '
-          exit 1
-        }
+        PYTHONPATH=src python -m pytest tests -v
