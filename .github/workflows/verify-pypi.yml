@@ -70,7 +70,7 @@ jobs:
               pkg_version = importlib.metadata.version("modelfit-mcp")
               is_pip_install = ("site-packages" in modelfit.__file__) or ("dist-packages" in modelfit.__file__)
               assert is_pip_install, f"Not from site/dist-packages: {modelfit.__file__}"
-              assert pkg_version == "0.1.0", f"Unexpected version: {pkg_version}"
+              assert pkg_version in ("0.1.0", "0.1.1"), f"Unexpected version: {pkg_version}"
               log_test("Import from PyPI", True, f"v{pkg_version} from {modelfit.__file__}")
           except Exception as e:
               log_test("Import from PyPI", False, f"{type(e).__name__}: {str(e)}")

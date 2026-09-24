@@ -30,7 +30,7 @@ class HFHardwareClient:
             params["pipeline_tag"] = pipeline_tag
 
         url = f"{self.BASE_URL}?{urllib.parse.urlencode(params)}"
-        req = urllib.request.Request(url, headers={"User-Agent": "ModelFit-MCP/0.1.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": "ModelFit-MCP/0.1.1"})
         if self.token:
             req.add_header("Authorization", f"Bearer {self.token}")
 

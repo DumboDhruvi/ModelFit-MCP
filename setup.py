@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="modelfit-mcp",
-    version="0.1.0",
+    version="0.1.1",
     description="Hardware-aware Hugging Face discovery, sizing, and swappable local model gateway for AI agents.",
     package_dir={"": "src"},
     packages=find_packages(where="src"),

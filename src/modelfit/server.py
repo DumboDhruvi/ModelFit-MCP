@@ -291,7 +291,7 @@ def run_stdio_server():
                         },
                         "serverInfo": {
                             "name": "modelfit-mcp",
-                            "version": "0.1.0",
+                            "version": "0.1.1",
                         },
                     },
                 }
